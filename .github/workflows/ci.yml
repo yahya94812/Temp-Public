@@ -26,12 +26,15 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
+        working-directory: my-react-project
         run: npm ci
 
       - name: Lint
+        working-directory: my-react-project
         run: npm run lint
 
       - name: Build
+        working-directory: my-react-project
         run: npm run build
         env:
           BASE_URL: /TEMP-PUBLIC/my-react-project          # replace with your exact repo name
