@@ -43,7 +43,7 @@ jobs:
       - name: Upload pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: dist
+          path: my-react-project/dist
 
   deploy:
     needs: lint-and-build
