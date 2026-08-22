@@ -624,6 +624,34 @@
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/speech-commands@0.5.4/dist/speech-commands.min.js"></script>
 
 <script>
+  // ---------------- Offline precache (service worker) ----------------
+  // Registers sw.js, which precaches this page's HTML plus the TFJS +
+  // Speech Commands CDN scripts on first visit (while online). After
+  // that, every load — including the very first load with no network
+  // at all, e.g. connected only to the chair's own WiFi hotspot — is
+  // served straight from the cache instead of the browser's offline
+  // interstitial, so the app shell and mic/voice code always come up.
+  let swUpdateBannerShown = false;
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => {
+      navigator.serviceWorker
+        .register("./sw.js")
+        .then((reg) => {
+          reg.addEventListener("updatefound", () => {
+            const installing = reg.installing;
+            if (!installing) return;
+            installing.addEventListener("statechange", () => {
+              if (installing.state === "installed" && navigator.serviceWorker.controller && !swUpdateBannerShown) {
+                swUpdateBannerShown = true;
+                console.info("A newer version is cached and will be used next load.");
+              }
+            });
+          });
+        })
+        .catch((err) => console.warn("Offline caching unavailable:", err));
+    });
+  }
+
   const WS_URL = "ws://192.168.4.1:81"; // ESP32 AP IP + WebSocket port
   const OBSTACLE_ALERT_DISPLAY_MS = 2500;
   const DEFAULT_TURN_DELAY_MS = 230;
