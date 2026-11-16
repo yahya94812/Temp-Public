@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Alex – English Teacher</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@esotericsoftware/spine-player@4.3.13/dist/spine-player.min.css">
+<script src="https://cdn.jsdelivr.net/npm/@esotericsoftware/spine-player@4.3.13/dist/iife/spine-player.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/livekit-client/2.15.6/livekit-client.umd.js"></script>
+<style>
+  :root{
+    --macaw:#3D82F6; --macaw-strong:#2F6FE4; --deep-blue:#2458B8; --doodle:#59A0FE;
+    --lagoon:#17B3D9; --lime:#93D851; --coral:#EF6F6C; --danger:#C74A38; --danger-edge:#9C3526;
+    --navy:#1B2A5A; --navy-66:rgba(27,42,90,.66); --navy-10:rgba(27,42,90,.10);
+    --mist:#E3F3FE; --wave-top:#BEE4FD; --wave-bottom:#CFEBFE; --white:#FFFFFF; --pale:#F1F8FE; --soft:#DCEEFC;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%;margin:0;overflow:hidden;overscroll-behavior:none;
+    background:linear-gradient(var(--wave-top),var(--mist) 50%,var(--wave-bottom));
+    font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:var(--navy)}
+  body{display:grid;place-items:center}
+
+  /* phone: full screen. wider screens: 9:20 frame */
+  #app{position:relative;display:flex;flex-direction:column;overflow:hidden;width:100vw;height:100dvh;
+    background:linear-gradient(var(--wave-top),var(--mist) 50%,var(--wave-bottom))}
+  @media (min-width:600px){#app{width:min(100vw,calc(100dvh * 9 / 20));height:min(100dvh,calc(100vw * 20 / 9));
+    border-radius:28px;box-shadow:0 18px 50px var(--navy-10),0 0 0 1px var(--navy-10)}}
+
+  #bg{position:absolute;inset:0;overflow:hidden;z-index:0}
+  #bg i{position:absolute;inset:0;background:url("bg.png") center/100% 100% no-repeat}
+  #stage{position:relative;z-index:1;flex:0 0 auto;width:100%;aspect-ratio:1/1;overflow:hidden}
+  #avatar{position:absolute;inset:0;z-index:1}
+  #avatar .spine-player,#avatar .spine-player-canvas{background:transparent}
+  #status{position:absolute;top:calc(env(safe-area-inset-top,0px) + 12px);left:50%;z-index:2;transform:translateX(-50%);
+    display:flex;align-items:center;gap:8px;background:var(--white);color:var(--navy-66);
+    font-size:13px;font-weight:500;padding:6px 14px 6px 11px;border-radius:99px;white-space:nowrap;
+    box-shadow:0 2px 10px var(--navy-10),0 0 0 1px var(--navy-10);pointer-events:none;max-width:92%}
+  #status i{width:9px;height:9px;border-radius:50%;background:var(--doodle);flex:0 0 auto}
+  #status[data-k=listen] i{background:var(--lime)}
+  #status[data-k=speak] i{background:var(--lagoon)}
+  #status[data-k=err] i{background:var(--coral)}
+  #status[data-k=err],#status[data-k=err] span{white-space:normal}
+
+  #sheet{position:relative;z-index:2;flex:1 1 auto;min-height:0;background:var(--white);
+    box-shadow:0 -4px 20px var(--navy-10);display:flex;flex-direction:column;align-items:center;gap:14px;
+    padding:16px 22px calc(env(safe-area-inset-bottom,0px) + 22px)}
+  #who{align-self:stretch;display:flex;align-items:baseline;gap:10px}
+  #who b{font-weight:700;font-size:22px}
+  #who span{font-size:14px;color:var(--navy-66)}
+  #caption{align-self:stretch;flex:1 1 auto;min-height:0;overflow-y:auto;scrollbar-width:none;
+    background:var(--pale);border-radius:18px;padding:13px 16px;
+    font-size:18px;font-weight:500;line-height:1.45;overflow-wrap:anywhere}
+  #caption::-webkit-scrollbar{display:none}
+  #caption.hint{color:var(--navy-66);font-weight:400;font-size:16px;display:flex;align-items:center}
+  #caption.fresh{animation:fresh .28s ease-out}
+  @keyframes fresh{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+  #controls{align-self:stretch;display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:12px}
+  .side{font:inherit;font-weight:600;font-size:14px;color:var(--navy);background:var(--pale);border:1px solid var(--navy-10);
+    border-radius:12px;padding:10px 12px;cursor:pointer;justify-self:start}
+  #speed{justify-self:end}
+  .side:disabled{opacity:.45}
+  .side[aria-pressed=true]{color:var(--danger);border-color:var(--danger)}
+  #mic{width:68px;height:68px;border-radius:50%;border:0;background:var(--macaw-strong);color:var(--white);
+    display:grid;place-items:center;cursor:pointer;box-shadow:0 5px 0 var(--deep-blue);transition:transform .08s,box-shadow .08s,background .2s}
+  #mic:active{transform:translateY(4px);box-shadow:0 1px 0 var(--deep-blue)}
+  #mic:disabled{background:var(--soft);color:var(--navy-66);box-shadow:0 5px 0 var(--navy-10)}
+  #mic.on{background:var(--danger);box-shadow:0 5px 0 var(--danger-edge)}
+  #mic.on:active{box-shadow:0 1px 0 var(--danger-edge)}
+  #mic svg{width:28px;height:28px}
+  #mic .stopI{display:none}#mic.on .micI{display:none}#mic.on .stopI{display:block}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="stage">
+    <div id="bg"><i></i></div>
+    <div id="avatar"></div>
+    <div id="status" data-k=""><i></i><span id="stxt">Loading…</span></div>
+  </div>
+  <div id="sheet">
+    <div id="who"><b id="whoName">Alex</b><span>Your English teacher</span></div>
+    <div id="caption" class="hint">Tap the microphone and say hello to start your lesson.</div>
+    <div id="controls">
+      <button id="mute" class="side" disabled aria-pressed="false">Mute</button>
+      <button id="mic" disabled aria-label="Start lesson">
+        <svg class="micI" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
+        <svg class="stopI" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2.5"/></svg>
+      </button>
+      <select id="speed" class="side" aria-label="Playback speed">
+        <option value="1">1×</option><option value="0.85">0.85×</option><option value="0.75">0.75×</option><option value="0.55">0.55×</option>
+      </select>
+    </div>
+    <div id="audio-host" hidden></div>
+  </div>
+</div>
+
+<script>
+const { Room, RoomEvent, Track } = LivekitClient;
+const $ = id => document.getElementById(id);
+const clamp = (x, a = 0, b = 1) => Math.max(a, Math.min(b, x));
+
+/* ================= Config =================
+   The RN app can inject  window.__CONFIG__ = { token, livekitUrl, tokenUrl, voice, lipDelayMs }
+   before the page loads. If no token is injected, the page fetches {token} from tokenUrl. */
+const CFG = Object.assign({
+  tokenUrl: "http://localhost:8000/token",          // desktop dev only; on a phone use an HTTPS endpoint or inject token
+  livekitUrl: "wss://livekit.testing.maahir.tech",
+  voice: "Fenrir",
+  lipDelayMs: 0,                                    // raise if the mouth moves before the sound
+}, window.__CONFIG__ || {});
+const NAME = "Alex";
+const SYSTEM = `You are ${NAME}, a warm, patient and encouraging English teacher talking with a student by voice.
+- Speak clear, natural English at a pace and vocabulary that suits the student's level; if they struggle, simplify.
+- Keep every reply short (1–3 sentences) and end with one easy question or small task so the student keeps talking.
+- When the student makes a grammar, word-choice or pronunciation mistake, gently give the corrected sentence once, briefly explain why, and invite them to try it again. Praise real progress.
+- Do not correct every small slip; focus on the most useful one at a time.
+- Stay on English learning: conversation practice, vocabulary, grammar, idioms and pronunciation. If the student speaks another language, answer in simple English and encourage them to try in English.
+- Start by greeting the student, asking their name and what they would like to practise today.`;
+
+// events to the React Native app (no-op in a normal browser)
+const emit = (type, data) => { try { window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({ type, ...data })); } catch {} };
+
+/* ================= Gemini bridge (unchanged from your page) ================= */
+class GeminiBridge {
+  constructor(room, audioContainer) {
+    this.room = room;
+    this.onready = null; this.onmessage = null; this.onclose = null; this.onspeed = null; this.onvad = null;
+    this._parts = []; this._chain = Promise.resolve();
+    this._enc = new TextEncoder(); this._dec = new TextDecoder();
+    room.on(RoomEvent.DataReceived, (payload, _p, _k, topic) => { if (topic === "gemini.down") this._rx(payload); });
+    room.on(RoomEvent.TrackSubscribed, (t) => { if (t.kind === Track.Kind.Audio) audioContainer.appendChild(t.attach()); });
+    room.on(RoomEvent.TrackUnsubscribed, (t) => t.detach().forEach((e) => e.remove()));
+  }
+  send(msg) {
+    if (msg.realtimeInput && msg.realtimeInput.audio) return;      // audio goes over the mic track
+    const bytes = this._enc.encode(JSON.stringify(msg));
+    const CHUNK = 12000;
+    this._chain = this._chain.then(async () => {
+      if (bytes.length < CHUNK) return this._pub(bytes, 0);
+      for (let i = 0; i < bytes.length; i += CHUNK)
+        await this._pub(bytes.subarray(i, i + CHUNK), i + CHUNK >= bytes.length ? 2 : 1);
+    });
+  }
+  setPlaybackSpeed(speed) { this.send({ bridge: { event: "playback_speed", speed } }); }
+  setVadEnabled(enabled) { this.send({ bridge: { event: "vad", enabled } }); }
+  startActivity() { this.send({ bridge: { event: "activity_start" } }); }
+  endActivity() { this.send({ bridge: { event: "activity_end" } }); }
+  _pub(body, flag) {
+    const out = new Uint8Array(body.length + 1);
+    out[0] = flag; out.set(body, 1);
+    return this.room.localParticipant.publishData(out, { reliable: true, topic: "gemini.up" });
+  }
+  _rx(payload) {
+    const flag = payload[0], body = payload.subarray(1);
+    if (flag === 0) return this._msg(this._dec.decode(body));
+    this._parts.push(body);
+    if (flag === 2) {
+      const all = new Uint8Array(this._parts.reduce((n, p) => n + p.length, 0));
+      let off = 0;
+      for (const p of this._parts) { all.set(p, off); off += p.length; }
+      this._parts = [];
+      this._msg(this._dec.decode(all));
+    }
+  }
+  _msg(text) {
+    const obj = JSON.parse(text);
+    if (obj.bridge) {
+      if (obj.bridge.event === "ready") this.onready?.();
+      else if (obj.bridge.event === "closed") this.onclose?.(obj.bridge);
+      else if (obj.bridge.event === "playback_speed") this.onspeed?.(obj.bridge.speed);
+      else if (obj.bridge.event === "vad") this.onvad?.(obj.bridge.enabled);
+      return;
+    }
+    this.onmessage?.(obj);
+  }
+}
+
+// ==== DSP BEGIN  (your lip-sync analysis, now reading the playing WebRTC audio) ====
+const S = { master:.7, visStr:1, jaw:.15, sharp:1.6, gain:1.4, gate:.08, atk:.5, rel:.3, sib:1, clos:.8 };  // "Subtle" preset
+const N = 1024;                               // ~21 ms at 48 kHz, same window length as before
+let SR = 48000;
+const rev = new Uint16Array(N), cosT = new Float32Array(N / 2), sinT = new Float32Array(N / 2), win = new Float32Array(N);
+for (let i = 0; i < N; i++) { rev[i] = (rev[i >> 1] >> 1) | ((i & 1) ? N >> 1 : 0); win[i] = 0.5 - 0.5 * Math.cos(2 * Math.PI * i / (N - 1)); }
+for (let i = 0; i < N / 2; i++) { cosT[i] = Math.cos(2 * Math.PI * i / N); sinT[i] = -Math.sin(2 * Math.PI * i / N); }
+const re = new Float32Array(N), im = new Float32Array(N), P = new Float32Array(N / 2);
+function fft() {
+  for (let i = 0; i < N; i++) { const j = rev[i]; if (j > i) { [re[i], re[j]] = [re[j], re[i]]; [im[i], im[j]] = [im[j], im[i]]; } }
+  for (let len = 2; len <= N; len <<= 1) {
+    const h = len >> 1, step = N / len;
+    for (let i = 0; i < N; i += len) for (let k = 0; k < h; k++) {
+      const wr = cosT[k * step], wi = sinT[k * step], a = i + k, b = a + h;
+      const tr = re[b] * wr - im[b] * wi, ti = re[b] * wi + im[b] * wr;
+      re[b] = re[a] - tr; im[b] = im[a] - ti; re[a] += tr; im[a] += ti;
+    }
+  }
+}
+let B = {};
+function initBins(sr) {
+  SR = sr;
+  const bin = hz => Math.min(N / 2 - 1, Math.round(hz * N / SR));
+  B = { f1a: bin(250), f1b: bin(1000), f2b: bin(3000), hiA: bin(4000), hiB: bin(10000), lo: bin(100) };
+}
+const KEYS = ["aa","E","I","O","U","SS","PP","jaw"];
+const zero = () => Object.fromEntries(KEYS.map(k => [k, 0]));
+let st, lastRms = 0;
+function resetDSP() { st = { peak: .05, f1lo: 450, f1hi: 700, f2lo: 1300, f2hi: 2200, speech: 0, quietT: 99, prev: zero() }; lastRms = 0; }
+initBins(SR); resetDSP();
+
+function centroid(a, b) { let n = 0, d = 0; for (let k = a; k < b; k++) { const m = Math.sqrt(P[k]); n += k * m; d += m; } return d > 1e-9 ? n / d * SR / N : 0; }
+function band(a, b) { let s = 0; for (let k = a; k < b; k++) s += P[k]; return s; }
+
+// x: Float32Array(N) of the latest samples (-1..1); dt: seconds since the previous call
+function analyze(x, dt) {
+  const kf = clamp(dt / 0.02, .25, 4);                     // keep smoothing frame-rate independent (tuned at 50 Hz)
+  const ema = r => 1 - Math.pow(1 - r, kf);
+  let sum = 0;
+  for (let i = 0; i < N; i++) { const s = x[i]; sum += s * s; re[i] = s * win[i]; im[i] = 0; }
+  const rms = Math.sqrt(sum / N); lastRms = rms;
+  fft(); for (let i = 0; i < N / 2; i++) P[i] = re[i] * re[i] + im[i] * im[i];
+
+  st.peak = Math.max(rms, st.peak * Math.pow(0.9995, kf));
+  const rel = rms / st.peak;
+  const lvl = clamp(Math.pow(Math.max(0, (rel - S.gate) / (1 - S.gate)), 0.6) * S.gain);
+
+  const tot = band(B.lo, B.hiB) + 1e-12, hf = band(B.hiA, B.hiB) / tot;
+  const sibRaw = clamp((hf - 0.3) / 0.35) * clamp(lvl * 3);
+  const voiced = clamp(1 - sibRaw * 1.2);
+
+  const f1 = centroid(B.f1a, B.f1b), f2 = centroid(B.f1b, B.f2b);
+  if (voiced > .5 && lvl > .2) {
+    st.f1lo += ema(f1 < st.f1lo ? .2 : .003) * (f1 - st.f1lo); st.f1hi += ema(f1 > st.f1hi ? .2 : .003) * (f1 - st.f1hi);
+    st.f2lo += ema(f2 < st.f2lo ? .2 : .003) * (f2 - st.f2lo); st.f2hi += ema(f2 > st.f2hi ? .2 : .003) * (f2 - st.f2hi);
+  }
+  const o  = clamp((f1 - st.f1lo) / Math.max(80, st.f1hi - st.f1lo));
+  const fr = clamp((f2 - st.f2lo) / Math.max(150, st.f2hi - st.f2lo));
+  const raw = {
+    aa: o * (1 - fr * .6),
+    E: Math.max(0, 1 - Math.abs(o - .55) * 2) * (.4 + .6 * fr),
+    I: (1 - o) * fr,
+    O: Math.max(0, 1 - Math.abs(o - .5) * 1.6) * (1 - fr),
+    U: (1 - o) * (1 - fr),
+  };
+  let tsum = 0; for (const k of ["aa","E","I","O","U"]) { raw[k] = Math.pow(raw[k], S.sharp); tsum += raw[k]; }
+
+  if (lvl > .15) { st.speech += ema(.05) * (lvl - st.speech); st.quietT = 0; } else st.quietT += dt;
+  const dip = st.quietT < .16 && st.speech > .25 ? clamp((st.speech * .5 - lvl) / (st.speech * .5)) : 0;
+
+  const v = voiced * lvl * S.visStr * S.master / (tsum || 1);
+  const target = {
+    aa: raw.aa * v, E: raw.E * v, I: raw.I * v, O: raw.O * v, U: raw.U * v,
+    SS: sibRaw * S.sib * S.master,
+    PP: dip * S.clos * S.master * (1 - lvl),
+    jaw: (lvl * voiced * S.jaw + sibRaw * .1) * S.master,
+  };
+  const f = {};
+  for (const key of KEYS) {
+    const a = ema(target[key] > st.prev[key] ? S.atk : S.rel);
+    f[key] = clamp(st.prev[key] + (target[key] - st.prev[key]) * a);
+  }
+  st.prev = f;
+  return f;
+}
+// ==== DSP END ====
+
+/* ================= Remote audio -> analyser ================= */
+let ac = null, srcNode = null, analyser = null, tbuf = new Float32Array(N);
+function hookAnalyser(mediaTrack) {
+  unhookAnalyser();
+  if (!ac || !mediaTrack) return;
+  try {
+    initBins(ac.sampleRate); resetDSP();
+    srcNode = ac.createMediaStreamSource(new MediaStream([mediaTrack]));
+    analyser = ac.createAnalyser(); analyser.fftSize = N; analyser.smoothingTimeConstant = 0;
+    srcNode.connect(analyser);          // deliberately NOT connected to ac.destination: the <audio> element already plays it
+  } catch (e) { console.warn("analyser hook failed", e); analyser = null; }
+}
+function unhookAnalyser() {
+  try { srcNode && srcNode.disconnect(); analyser && analyser.disconnect(); } catch {}
+  srcNode = analyser = null;
+}
+
+/* ================= Spine avatar ================= */
+const ROLES = ["aa","E","I","O","U","SS","PP","jaw","rest"];
+const M = { aa:8, E:9, I:17, O:7, U:13, SS:5, PP:15, jaw:10, rest:21 };      // pose animation per mouth sound
+const TRACK = { idle: 0, talk: 2, base: 4 };
+const poseEntries = {};
+let player, idleName = null, listenName = null, talkName = null;
+let cur = zero(), talkAmt = 0, listening = false, speakHold = 0, sigT = 0, lipQ = [];
+const pick = (names, rx) => names.find(n => rx.test(n)) || null;
+
+function mkPose(track, name, loop = true) {
+  if (!player.skeleton.data.findAnimation(name)) return null;
+  const e = player.animationState.setAnimation(track, name, loop);
+  e.additive = true; e.alpha = 0; e.mixDuration = 0;
+  return e;
+}
+function setBase(name) {
+  if (!name) return;
+  const e = player.animationState.getTrack(TRACK.idle);
+  if (e && e.animation.name === name) return;
+  player.animationState.setAnimation(TRACK.idle, name, true).mixDuration = .4;
+}
+
+let agentSpeaking = false;
+function frameUpdate(p, delta) {
+  if (!player || !player.skeleton) return;
+  const dt = Math.min(delta, .1), now = performance.now() / 1000;
+
+  // is the agent talking? (LiveKit's own level for the remote participant, with a short hold)
+  const agent = room ? [...room.remoteParticipants.values()][0] : null;
+  const level = agent ? agent.audioLevel : 0;
+  if (level > .02) speakHold = now + .25;
+  agentSpeaking = now < speakHold;
+
+  // mouth shapes from the audio that is actually playing
+  let f = null;
+  if (analyser) {
+    analyser.getFloatTimeDomainData(tbuf);
+    f = analyze(tbuf, dt);
+    if (lastRms > 2e-4) sigT = now;
+  }
+  const analyserAlive = analyser && now - sigT < .5;
+  if (!analyserAlive && agentSpeaking) {            // analyser got no signal (some WebViews): fall back to loudness only
+    const fb = clamp(level * 1.6);
+    const tgt = { aa: fb * .5, E: fb * .15, I: 0, O: fb * .2, U: 0, SS: 0, PP: 0, jaw: fb * .35 };
+    f = {}; for (const k of KEYS) f[k] = cur[k] + (tgt[k] - cur[k]) * (1 - Math.exp(-dt * 20));
+  }
+  if (f) lipQ.push({ t: now + CFG.lipDelayMs / 1000, f });
+  let g = null;
+  while (lipQ.length && lipQ[0].t <= now) g = lipQ.shift().f;
+  if (g) for (const k of KEYS) cur[k] = g[k];
+  else if (!agentSpeaking && !lipQ.length) for (const k of KEYS) cur[k] *= Math.exp(-dt * 14);
+
+  let sum = 0; const w = {};
+  for (const k of KEYS) { w[k] = clamp(cur[k]); sum += w[k]; }
+  ROLES.forEach(role => { const e = poseEntries[role]; if (e) e.alpha = role === "rest" ? clamp(1 - sum) : w[role]; });
+
+  talkAmt += ((agentSpeaking ? .6 : 0) - talkAmt) * Math.min(1, dt * 4);
+  const te = player.animationState.getTrack(TRACK.talk);
+  if (te) te.alpha = talkAmt;
+  setBase(listening && !agentSpeaking && listenName ? listenName : idleName);
+  if (setupDone) setLiveState(agentSpeaking ? "speak" : "listen");
+}
+
+// Pin the avatar's feet to the bottom of the square stage
+function fitBottom(p) {
+  try {
+    const sk = p.skeleton; let b;
+    if (sk.getBoundsRect) b = sk.getBoundsRect();
+    else { const o = new spine.Vector2(), s = new spine.Vector2(); sk.getBounds(o, s, []); b = { x: o.x, y: o.y, width: s.x, height: s.y }; }
+    if (!isFinite(b.width) || !b.width || !b.height) return;
+    const side = Math.max(b.width * 1.06, b.height * 1.02);
+    const vp = { x: b.x + b.width / 2 - side / 2, y: b.y, width: side, height: side, padLeft: 0, padRight: 0, padTop: 0, padBottom: 0, transitionTime: 0 };
+    p.currentViewport = vp; p.previousViewport = { ...vp };
+  } catch (e) { console.warn("fitBottom failed", e); }
+}
+function loadAvatar() {
+  setStatus("Loading " + NAME + "…");
+  player = new spine.SpinePlayer("avatar", {
+    skeleton: "Alex.skel", atlas: "Alex.atlas",
+    showControls: false, alpha: true, backgroundColor: "#00000000", defaultMix: .2,
+    viewport: { padLeft: "4%", padRight: "4%", padTop: "6%", padBottom: "0%" },
+    update: frameUpdate,
+    success: p => {
+      player = p;
+      const ANIMS = p.skeleton.data.animations.map(a => a.name);
+      idleName = ANIMS.includes("Idle") ? "Idle" : pick(ANIMS, /idle/i) || ANIMS.find(a => !/^\d+$/.test(a)) || ANIMS[0];
+      listenName = pick(ANIMS, /listen/i);
+      talkName = pick(ANIMS, /speak|talk/i);
+      if (idleName) p.animationState.setAnimation(TRACK.idle, idleName, true);
+      if (talkName) { const te = mkPose(TRACK.talk, talkName); if (te) te.alpha = 0; }
+      ROLES.forEach((role, i) => { poseEntries[role] = M[role] ? mkPose(TRACK.base + i, String(M[role])) : null; });
+      fitBottom(p); setTimeout(() => fitBottom(p), 0); setTimeout(() => fitBottom(p), 400);
+      setStatus("Ready"); $("mic").disabled = false; emit("avatar_ready");
+    },
+    error: (p, m) => { setStatus("Couldn't load " + NAME + " – check Alex.skel / Alex.atlas / Alex.png are next to this page", "err"); emit("error", { where: "avatar", message: String(m) }); },
+  });
+}
+
+/* ================= UI helpers ================= */
+let shownState = "";
+function setStatus(t, k = "") { const s = $("status"), x = $("stxt"); if (x.textContent !== t) x.textContent = t; s.dataset.k = k; s.style.display = t ? "" : "none"; }
+function setLiveState(k) {
+  if (k === shownState) return;
+  shownState = k;
+  setStatus(k === "speak" ? NAME + " is speaking" : "Listening…", k);
+  emit("state", { state: k === "speak" ? "speaking" : "listening" });
+}
+const cap = $("caption");
+let newTurn = true;
+function showAI(text) {
+  if (!text) return;
+  if (newTurn) {
+    newTurn = false; cap.textContent = ""; cap.className = "";
+    void cap.offsetWidth; cap.classList.add("fresh");
+    text = text.replace(/^\s+/, "");
+  }
+  cap.textContent += text;
+  cap.scrollTop = cap.scrollHeight;
+}
+
+/* ================= Gemini (via LiveKit bridge) ================= */
+let room = null, gem = null, setupDone = false, greeted = false;
+
+const TOOLS = {
+  get_current_time({ timezone = "UTC" } = {}) {
+    try { return { timezone, time: new Date().toLocaleString("en-GB", { timeZone: timezone, hour12: false }) }; }
+    catch { return { error: `unknown timezone ${timezone}` }; }
+  },
+};
+function buildSetup() {
+  return {
+    model: "models/gemini-3.8-live",
+    generationConfig: {
+      responseModalities: ["AUDIO"],
+      speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: CFG.voice } } },
+    },
+    systemInstruction: { parts: [{ text: SYSTEM }] },
+    inputAudioTranscription: {},
+    outputAudioTranscription: {},
+    contextWindowCompression: { slidingWindow: {} },
+    tools: [{ functionDeclarations: [{
+      name: "get_current_time",
+      description: "Get the current date and time, optionally for an IANA timezone such as Asia/Kolkata.",
+      parameters: { type: "OBJECT", properties: { timezone: { type: "STRING", description: "IANA timezone. Defaults to UTC." } } },
+    }] }],
+  };
+}
+function handleGemini(m) {
+  if (m.setupComplete) {
+    setupDone = true; listening = true; setLiveState("listen");
+    if (!greeted) { greeted = true; gem.send({ realtimeInput: { text: "Greet the student warmly, ask their name and what they would like to practise today." } }); }
+  }
+  if (m.toolCall) {
+    const functionResponses = m.toolCall.functionCalls.map(fc => {
+      const fn = TOOLS[fc.name];
+      return { id: fc.id, name: fc.name, response: fn ? fn(fc.args || {}) : { error: `unknown tool ${fc.name}` } };
+    });
+    gem.send({ toolResponse: { functionResponses } });
+  }
+  const sc = m.serverContent; if (!sc) return;
+  if (sc.inputTranscription?.text) emit("user_text", { text: sc.inputTranscription.text });
+  if (sc.outputTranscription?.text) { showAI(sc.outputTranscription.text); emit("agent_text", { text: sc.outputTranscription.text }); }
+  if (sc.interrupted || sc.turnComplete) newTurn = true;
+}
+
+async function fetchToken() {
+  const res = await fetch(CFG.tokenUrl);
+  if (!res.ok) throw new Error(`Token request failed (${res.status})`);
+  return (await res.json()).token;
+}
+
+async function connect() {
+  $("mic").disabled = true; setStatus("Connecting…");
+  // Create/resume the AudioContext synchronously, inside the tap, so the WebView allows it.
+  ac = ac || new (window.AudioContext || window.webkitAudioContext)();
+  ac.resume && ac.resume();
+  try {
+    const token = CFG.token || await fetchToken();
+    room = new Room({
+      adaptiveStream: true, dynacast: true,
+      publishDefaults: { dtx: false },
+      audioCaptureDefaults: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+    });
+    gem = new GeminiBridge(room, $("audio-host"));           // created before connect so no message is missed
+    gem.onready = () => {
+      setupDone = false; setStatus("Setting up…");
+      gem.send({ setup: buildSetup() });
+      const s = parseFloat($("speed").value); if (s !== 1) gem.setPlaybackSpeed(s);
+    };
+    gem.onclose = ({ code, reason }) => { setupDone = false; setStatus("Reconnecting…"); emit("gemini_closed", { code, reason }); };
+    gem.onmessage = handleGemini;
+    gem.onspeed = s => { $("speed").value = String(s); };
+    room.on(RoomEvent.TrackSubscribed, t => { if (t.kind === Track.Kind.Audio) hookAnalyser(t.mediaStreamTrack); });
+    room.on(RoomEvent.TrackUnsubscribed, t => { if (t.kind === Track.Kind.Audio) unhookAnalyser(); });
+    room.on(RoomEvent.Disconnected, onDisconnected);
+
+    await room.connect(CFG.livekitUrl, token);
+    await room.startAudio();
+    await room.localParticipant.setMicrophoneEnabled(true);
+
+    $("mic").classList.add("on"); $("mic").disabled = false; $("mute").disabled = false;
+    setStatus("Waiting for " + NAME + "…"); emit("connected");
+  } catch (err) {
+    console.error(err);
+    if (room) { try { room.disconnect(); } catch {} }
+    room = null; gem = null;
+    $("mic").disabled = false; $("mic").classList.remove("on");
+    setStatus(err.message || "Couldn't connect", "err"); emit("error", { where: "connect", message: String(err.message || err) });
+  }
+}
+function onDisconnected() {
+  unhookAnalyser(); room = null; gem = null; setupDone = false; greeted = false; listening = false;
+  shownState = ""; speakHold = 0; lipQ = []; newTurn = true;
+  $("mic").classList.remove("on"); $("mic").disabled = !player?.skeleton;
+  $("mute").disabled = true; $("mute").setAttribute("aria-pressed", "false"); $("mute").textContent = "Mute";
+  setStatus("Ready"); emit("disconnected");
+}
+
+$("mic").onclick = () => (room ? room.disconnect() : connect());
+$("speed").onchange = () => gem && gem.setPlaybackSpeed(parseFloat($("speed").value));
+// Mute = the mic track outputs silence; the track stays published (same approach as your page)
+$("mute").onclick = () => {
+  const t = room?.localParticipant.getTrackPublication(Track.Source.Microphone)?.track?.mediaStreamTrack;
+  if (!t) return;
+  t.enabled = !t.enabled;
+  $("mute").setAttribute("aria-pressed", String(!t.enabled));
+  $("mute").textContent = t.enabled ? "Mute" : "Unmute";
+};
+
+loadAvatar();
+</script>
+</body>
+</html>
